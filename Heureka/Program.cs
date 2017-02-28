@@ -30,7 +30,6 @@ namespace Heureka
                 }
             }
             Console.ReadKey();
-
         }
     }
 
@@ -38,6 +37,7 @@ namespace Heureka
     {
         Graph graph;
         Node pos;
+        Dictionary<string, double> distance = new Dictionary<string, double>();
 
         public Pathfinder(Graph graph, int x, int y)
         {
@@ -57,11 +57,11 @@ namespace Heureka
             var frontier = new List<Node>();
             var visited = new List<Node>();
             frontier.Add(pos);
+            distance.Add(pos.ToString(), 0);
             while(frontier.Count > 0)
             {
                 var node = RemoveCheapestNode(frontier, goal);
                 if (node.Equals(goal))
-                    //return new List<Edge>();
                     return RetrievePath(parent, goal);
                 Console.WriteLine("\nStanding at " + node.ToString());
                 if (!visited.Contains(node))
@@ -70,13 +70,20 @@ namespace Heureka
                     Console.WriteLine("Current node has " + node.GetEdges().Count + " edges");
                     foreach(var edge in node.GetEdges())
                     {
+                        // TODO A* cases
+                        //if (frontier.Contains(edge.end))
+                        //{
+
+                        //}
                         Console.WriteLine("Adding node " + edge.end.x + "," + edge.end.y + " to OPEN");
                         frontier.Add(edge.end);
                         try
                         {
                             parent.Add(edge.end.ToString(), node);
+                            distance.Add(edge.end.ToString(), edge.Length());
                         } catch (Exception e)
                         {
+                            Console.WriteLine(e.StackTrace);
                         }
                     }
                 }
@@ -120,7 +127,8 @@ namespace Heureka
             for(int i = 0; i < nodes.Count; i++)
             {
                 var euclidean = nodes[i].EuclideanDistance(target);
-                if (euclidean < cost || cost == -1)
+                var distance = this.distance[nodes[i].ToString()];
+                if (euclidean + distance < cost || cost == -1)
                 {
                     cost = euclidean;
                     index = i;
