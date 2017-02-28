@@ -19,6 +19,19 @@ namespace Heureka
         }
     }
 
+    class Node
+    {
+        protected List<Node> inn;
+
+
+        public Node(int x, int y)
+        {
+
+
+        }
+
+    }
+
     
 
 
