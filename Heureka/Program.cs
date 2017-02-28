@@ -12,18 +12,136 @@ namespace Heureka
         {
             var constructor = new GraphConstructor("C:/AI/copenhagen.txt");
             var graph = constructor.getGraph();
+            Console.WriteLine("\n[Graph size: " + graph.nodes.Count + "]");
+            Console.WriteLine("[Edge count: " + graph.edges.Count + "]");
 
-            Console.WriteLine("Graph size: " + graph.nodes.Count);
+            // Where Are We?
+            var pathfinder = new Pathfinder(graph, 10, 70);
 
-            foreach(var i in graph.nodes)
+            // Where To?
+            var path = pathfinder.Find(35, 120);
+
+            if (path != null)
             {
-                Console.WriteLine("Node: " + i.x + ", " + i.y);
+                Console.WriteLine("\nFound path to destination!\n");
+                foreach(var edge in path)
+                {
+                    Console.WriteLine(edge.ToString());
+                }
             }
-
             Console.ReadKey();
 
         }
     }
+
+    class Pathfinder
+    {
+        Graph graph;
+        Node pos;
+
+        public Pathfinder(Graph graph, int x, int y)
+        {
+            this.graph = graph;
+            pos = SearchNode(x, y);
+        }
+
+        public List<Edge> Find(int x, int y)
+        {
+            var goal = SearchNode(x, y);
+            Dictionary<string, Node> parent = new Dictionary<string, Node>();
+
+            if (graph.isNullOrEmpty() || pos == null || goal == null)
+                return null;
+            Console.WriteLine("Initiating search...");
+
+            var frontier = new List<Node>();
+            var visited = new List<Node>();
+            frontier.Add(pos);
+            while(frontier.Count > 0)
+            {
+                var node = RemoveCheapestNode(frontier, goal);
+                if (node.Equals(goal))
+                    //return new List<Edge>();
+                    return RetrievePath(parent, goal);
+                Console.WriteLine("\nStanding at " + node.ToString());
+                if (!visited.Contains(node))
+                {
+                    visited.Add(node);
+                    Console.WriteLine("Current node has " + node.GetEdges().Count + " edges");
+                    foreach(var edge in node.GetEdges())
+                    {
+                        Console.WriteLine("Adding node " + edge.end.x + "," + edge.end.y + " to OPEN");
+                        frontier.Add(edge.end);
+                        try
+                        {
+                            parent.Add(edge.end.ToString(), node);
+                        } catch (Exception e)
+                        {
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
+        public List<Edge> RetrievePath(Dictionary<string, Node> parent, Node goal)
+        {
+            var path = new List<Edge>();
+            var node = goal;
+            while (node != pos)
+            {
+                try
+                {
+                    var p = parent[node.ToString()];
+                    path.Add(p.GetEdgeToNode(node));
+                    node = p;
+                } catch (Exception e)
+                {
+                    Console.WriteLine(e.StackTrace);
+                    return new List<Edge>();
+                }
+            }
+            path.Reverse();
+            return path;
+        }
+
+        public Node RemoveCheapestNode(List<Node> nodes, Node target)
+        {
+            var index = IndexOfCheapestNode(nodes, target);
+            var node = nodes[index];
+            nodes.RemoveAt(index);
+            return node;
+        }
+
+        public int IndexOfCheapestNode(List<Node> nodes, Node target)
+        {
+            double cost = -1;
+            int index = 0;
+            for(int i = 0; i < nodes.Count; i++)
+            {
+                var euclidean = nodes[i].EuclideanDistance(target);
+                if (euclidean < cost || cost == -1)
+                {
+                    cost = euclidean;
+                    index = i;
+                }
+            }
+            return index;
+        }
+
+        public Node SearchNode(int x, int y)
+        {
+            foreach (var node in graph.nodes)
+            {
+                if (node.x == x && node.y == y)
+                {
+                    return node;
+                }
+            }
+            return null;
+        }
+    }
+
 
     class GraphConstructor
     {
@@ -34,35 +152,35 @@ namespace Heureka
             string[] lines = System.IO.File.ReadAllLines(filepath);
             foreach(var line in lines)
             {
-                Console.WriteLine(line);
                 var keys = line.Split(' ');
-
                 var start = new Node(Convert.ToDouble(keys[0]), Convert.ToDouble(keys[1]));
                 var end = new Node(Convert.ToDouble(keys[3]), Convert.ToDouble(keys[4]));
-                var connection = new Edge(start, end, keys[2]);
+                var edge = new Edge(start, end, keys[2]);
+                start.AddEdge(edge);
 
                 if (!line.Equals(lines[0]))
                 {
-                    foreach (var node in graph.nodes.AsEnumerable<Node>())
+                    bool addStart = true, addEnd = true;
+                    foreach (var node in graph.nodes)
                     {
-                        if (!node.Equals(start))
-                            graph.AddNode(start);
-
-                        if (!node.Equals(end))
-                            graph.AddNode(end);
+                        if (node.Equals(start))
+                        {
+                            addStart = false;
+                            node.AddEdge(edge);
+                        }
+                        if (node.Equals(end))
+                            addEnd = false;
                     }
-
-                    foreach (var edge in graph.edges)
-                    {
-                        if (!edge.Equals(connection))
-                            graph.AddEdge(connection);
-
-                    }
+                    if (addStart)
+                        graph.AddNode(start);
+                    if (addEnd)
+                        graph.AddNode(end);
+                    graph.AddEdge(edge);
                 } else
                 {
                     graph.AddNode(start);
                     graph.AddNode(end);
-                    graph.AddEdge(connection);
+                    graph.AddEdge(edge);
                 }
             }
         }
@@ -71,7 +189,6 @@ namespace Heureka
         {
             return graph;
         }
-
     }
 
     class Graph
@@ -89,14 +206,22 @@ namespace Heureka
         public void AddEdge(Edge edge)
         {
             edges.Add(edge);
+            edge.start.AddEdge(edge);
         }
 
+        public bool isNullOrEmpty()
+        {
+            if (this == null)
+                return true;
+
+            return (nodes.Count == 0 || edges.Count == 0);
+        }
     }
 
     class Node
     {
         public double x, y;
-        protected List<Edge> edges;
+        protected List<Edge> edges = new List<Edge>();
 
         public Node(double x, double y, Edge edge = null)
         {
@@ -113,11 +238,35 @@ namespace Heureka
             edges.Add(edge);
         }
 
+        public Edge GetEdgeToNode(Node node)
+        {
+            foreach(var edge in edges)
+            {
+                if (edge.end.Equals(node))
+                    return edge;
+            }
+            return null;
+        }
+
+        public List<Edge> GetEdges()
+        {
+            return edges;
+        }      
+
+        public double EuclideanDistance(Node target)
+        {
+            return Math.Sqrt(Math.Pow(x - target.x, 2) + Math.Pow(y - target.y, 2));
+        }
+
         public bool Equals(Node node)
         {
             return (x == node.x && y == node.y);
         }
 
+        public override string ToString()
+        {
+            return "[" + x + "," + y + "]";
+        }
     }
 
     class Edge
@@ -128,22 +277,25 @@ namespace Heureka
 
         public Edge(Node start, Node end, string street)
         {
-            this.start = end;
+            this.start = start;
+            this.end = end;
             this.street = street;
         }
 
         public bool Equals(Edge edge)
         {
             return (start.Equals(edge.start) && end.Equals(edge.end) && street.Equals(edge.street));
-        } 
+        }
+
+        public override string ToString()
+        {
+            //return start.ToString() + " " + street + " " + end.ToString();
+            return street;
+        }
 
         public double Length()
         {
-            return Math.Sqrt(Math.Pow(end.x - start.x, 2) + Math.Pow(end.y - start.y, 2));
+            return start.EuclideanDistance(end);
         }
-
     }
-
-
-
 }
