@@ -24,7 +24,6 @@ namespace Heureka
             if (path != null)
             {
                 Console.WriteLine("\nFound path to destination!\n\n" +
-
 "          /\n" +
 "       -=<==-< ---- SEE YA LATER ----\n" +
 "          \\ \n");
