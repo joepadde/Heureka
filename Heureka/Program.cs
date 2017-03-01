@@ -10,16 +10,16 @@ namespace Heureka
     {
         static void Main(string[] args)
         {
-            var constructor = new GraphConstructor("C:/AI/copenhagen.txt");
+            var constructor = new GraphConstructor("C:/AI/test.txt");
             var graph = constructor.getGraph();
             Console.WriteLine("\n[Graph size: " + graph.nodes.Count + "]");
             Console.WriteLine("[Edge count: " + graph.edges.Count + "]");
 
             // Where Are We?
-            var pathfinder = new Pathfinder(graph, 10, 70);
+            var pathfinder = new Pathfinder(graph, 50, 90);
 
             // Where To?
-            var path = pathfinder.Find(35, 120);
+            var path = pathfinder.Find(10, 20);
 
             if (path != null)
             {
@@ -28,6 +28,9 @@ namespace Heureka
                 {
                     Console.WriteLine(edge.ToString());
                 }
+            } else
+            {
+                Console.WriteLine("\nNo path was found :(");
             }
             Console.ReadKey();
         }
@@ -52,7 +55,7 @@ namespace Heureka
 
             if (graph.isNullOrEmpty() || pos == null || goal == null)
                 return null;
-            Console.WriteLine("Initiating search...");
+            Console.WriteLine("\nInitiating search...");
 
             var frontier = new List<Node>();
             var visited = new List<Node>();
@@ -63,27 +66,24 @@ namespace Heureka
                 var node = RemoveCheapestNode(frontier, goal);
                 if (node.Equals(goal))
                     return RetrievePath(parent, goal);
-                Console.WriteLine("\nStanding at " + node.ToString());
                 if (!visited.Contains(node))
                 {
                     visited.Add(node);
-                    Console.WriteLine("Current node has " + node.GetEdges().Count + " edges");
                     foreach(var edge in node.GetEdges())
                     {
-                        // TODO A* cases
-                        //if (frontier.Contains(edge.end))
-                        //{
-
-                        //}
-                        Console.WriteLine("Adding node " + edge.end.x + "," + edge.end.y + " to OPEN");
-                        frontier.Add(edge.end);
-                        try
+                        if (frontier.Contains(edge.end) && distance.ContainsKey(edge.end.ToString()))
                         {
-                            parent.Add(edge.end.ToString(), node);
-                            distance.Add(edge.end.ToString(), edge.Length());
-                        } catch (Exception e)
+                            if (edge.Length() < distance[edge.end.ToString()])
+                            {
+                                parent[edge.end.ToString()] = node;
+                                distance[edge.end.ToString()] = distance[edge.start.ToString()] + edge.Length();
+                            }
+                        } else
                         {
-                            Console.WriteLine(e.StackTrace);
+                            frontier.Add(edge.end);
+                            if (!parent.ContainsKey(edge.end.ToString()))
+                                parent[edge.end.ToString()] = node;
+                            distance[edge.end.ToString()] = distance[edge.start.ToString()] + edge.Length();
                         }
                     }
                 }
@@ -116,6 +116,7 @@ namespace Heureka
         {
             var index = IndexOfCheapestNode(nodes, target);
             var node = nodes[index];
+            //Console.WriteLine("\nCheapest note is " + node + " with f(n)=" + (distance[node.ToString()] + node.EuclideanDistance(target)));
             nodes.RemoveAt(index);
             return node;
         }
@@ -128,9 +129,10 @@ namespace Heureka
             {
                 var euclidean = nodes[i].EuclideanDistance(target);
                 var distance = this.distance[nodes[i].ToString()];
-                if (euclidean + distance < cost || cost == -1)
+                var total = euclidean + distance;
+                if (total < cost || cost == -1)
                 {
-                    cost = euclidean;
+                    cost = total;
                     index = i;
                 }
             }
