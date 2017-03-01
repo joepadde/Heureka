@@ -23,8 +23,12 @@ namespace Heureka
 
             if (path != null)
             {
-                Console.WriteLine("\nFound path to destination!\n");
-                foreach(var edge in path)
+                Console.WriteLine("\nFound path to destination!\n\n" +
+
+"          /\n" +
+"       -=<==-< ---- SEE YA LATER ----\n" +
+"          \\ \n");
+                foreach (var edge in path)
                 {
                     Console.WriteLine(edge.ToString());
                 }
