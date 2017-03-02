@@ -10,31 +10,29 @@ namespace Heureka
     {
         static void Main(string[] args)
         {
-            var constructor = new GraphConstructor("C:/AI/test.txt");
+            var constructor = new GraphConstructor("C:/AI/manhattan.txt");
             var graph = constructor.getGraph();
             Console.WriteLine("\n[Graph size: " + graph.nodes.Count + "]");
             Console.WriteLine("[Edge count: " + graph.edges.Count + "]");
 
             // Where Are We?
-            var pathfinder = new Pathfinder(graph, 50, 90);
+            var pathfinder = new Pathfinder(graph, 9, 9);
 
             // Where To?
-            var path = pathfinder.Find(10, 20);
-
-            if (path != null)
+            // NOTE: when going backwards, only first edge construction is proper
+            for (int i = 8; i >= 8; i--)
             {
-                Console.WriteLine("\nFound path to destination!\n\n" +
-"          /\n" +
-"       -=<==-< ---- SEE YA LATER ----\n" +
-"          \\ \n");
-                foreach (var edge in path)
+                var path = pathfinder.Find(i, i);
+                if (path != null)
                 {
-                    Console.WriteLine(edge.ToString());
+                    Console.WriteLine("Found path to destination!");
+                    foreach (var edge in path)
+                        Console.WriteLine(edge.ToString());
                 }
-            } else
-            {
-                Console.WriteLine("\nNo path was found :(");
+                else
+                    Console.WriteLine("No path was found :(");
             }
+
             Console.ReadKey();
         }
     }
@@ -58,12 +56,12 @@ namespace Heureka
 
             if (graph.isNullOrEmpty() || pos == null || goal == null)
                 return null;
-            Console.WriteLine("\nInitiating search...");
+            Console.WriteLine("\nInitiating search for " + goal.ToString() + " ...");
 
             var frontier = new List<Node>();
             var visited = new List<Node>();
             frontier.Add(pos);
-            distance.Add(pos.ToString(), 0);
+            distance[pos.ToString()] = 0;
             while(frontier.Count > 0)
             {
                 var node = RemoveCheapestNode(frontier, goal);
@@ -166,35 +164,45 @@ namespace Heureka
             foreach(var line in lines)
             {
                 var keys = line.Split(' ');
-                var start = new Node(Convert.ToDouble(keys[0]), Convert.ToDouble(keys[1]));
-                var end = new Node(Convert.ToDouble(keys[3]), Convert.ToDouble(keys[4]));
-                var edge = new Edge(start, end, keys[2]);
-                start.AddEdge(edge);
+                if (keys.Length == 5)
+                {
+                    var start = new Node(Convert.ToDouble(keys[0]), Convert.ToDouble(keys[1]));
+                    var end = new Node(Convert.ToDouble(keys[3]), Convert.ToDouble(keys[4]));
+                    var edge = new Edge(start, end, keys[2]);
+                    //start.AddEdge(edge);
 
-                if (!line.Equals(lines[0]))
-                {
-                    bool addStart = true, addEnd = true;
-                    foreach (var node in graph.nodes)
+                    if (!line.Equals(lines[0]))
                     {
-                        if (node.Equals(start))
+                        bool addStart = true, addEnd = true;
+                        Node n = null;
+                        foreach (var node in graph.nodes)
                         {
-                            addStart = false;
-                            node.AddEdge(edge);
+                            if (node.Equals(start))
+                            {
+                                addStart = false;
+                                n = node;
+                            }
+                            if (node.Equals(end))
+                            {
+                                addEnd = false;
+                            }
                         }
-                        if (node.Equals(end))
-                            addEnd = false;
+                        if (addStart)
+                            graph.AddNode(start);
+                        if (addEnd)
+                            graph.AddNode(end);
+                        if (n != null)
+                            edge.start = n;
+                        graph.AddEdge(edge);
                     }
-                    if (addStart)
+                    else
+                    {
                         graph.AddNode(start);
-                    if (addEnd)
                         graph.AddNode(end);
-                    graph.AddEdge(edge);
-                } else
-                {
-                    graph.AddNode(start);
-                    graph.AddNode(end);
-                    graph.AddEdge(edge);
+                        graph.AddEdge(edge);
+                    }
                 }
+                
             }
         }
 
