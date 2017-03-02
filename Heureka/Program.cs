@@ -4,37 +4,78 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+/*
+ * Heureka 2017
+ * 02180 Introduction to Artificial Intelligence
+ * Asbjorn Kruuse, Nicklas Hansen
+ */
+
 namespace Heureka
 {
     class Program
     {
         static void Main(string[] args)
         {
-            var constructor = new GraphConstructor("C:/AI/manhattan.txt");
-            var graph = constructor.getGraph();
-            Console.WriteLine("\n[Graph size: " + graph.nodes.Count + "]");
-            Console.WriteLine("[Edge count: " + graph.edges.Count + "]");
+            // Constructs a new graph from specified file
+            var graph = GraphFromFile("C:/AI/manhattan.txt");
 
-            // Where Are We?
+            // Where are we?
             var pathfinder = new Pathfinder(graph, 9, 9);
 
-            // Where To?
-            // NOTE: when going backwards, only first edge construction is proper
-            for (int i = 8; i >= 8; i--)
-            {
-                var path = pathfinder.Find(i, i);
-                if (path != null)
-                {
-                    Console.WriteLine("Found path to destination!");
-                    foreach (var edge in path)
-                        Console.WriteLine(edge.ToString());
-                }
-                else
-                    Console.WriteLine("No path was found :(");
-            }
+            // Where to?
+            var route = GetRouteAsList(pathfinder, 0, 0);
 
-            Console.ReadKey();
+            // Print route to Console (optionally file)
+            var filepath = "C:/Users/nickl/Desktop/route.txt";
+            PrintRoute(route, filepath);
+
+            // If printing to file, open it, else leave Console open
+            OpenFileIfExists(filepath);
         }
+
+        #region Helper Functions
+
+        public static Graph GraphFromFile(string file)
+        {
+            var constructor = new GraphConstructor(file);
+            return constructor.getGraph();
+        }
+
+        public static void PrintRoute(List<String> route, string filepath = null)
+        {
+            foreach(var street in route)
+                Console.WriteLine(street);
+            if (!String.IsNullOrEmpty(filepath))
+                try
+                {
+                    System.IO.File.WriteAllLines(filepath, route);
+                } catch (Exception e)
+                {
+                    Console.WriteLine("\nERROR: Could not write to file");
+                }
+        }
+
+        public static List<String> GetRouteAsList(Pathfinder pathfinder, int x, int y)
+        {
+            var route = new List<String>();
+            var path = pathfinder.Find(x, y);
+            if (path != null)
+                foreach (var edge in path)
+                    route.Add(edge.street);
+            else
+                route.Add("Destination cannot be reached!");
+            return route;
+        }
+
+        public static void OpenFileIfExists(string filepath)
+        {
+            if (!String.IsNullOrEmpty(filepath))
+                System.Diagnostics.Process.Start(filepath);
+            else
+                Console.ReadKey();
+        }
+
+        #endregion
     }
 
     class Pathfinder
@@ -53,11 +94,8 @@ namespace Heureka
         {
             var goal = SearchNode(x, y);
             Dictionary<string, Node> parent = new Dictionary<string, Node>();
-
             if (graph.isNullOrEmpty() || pos == null || goal == null)
                 return null;
-            Console.WriteLine("\nInitiating search for " + goal.ToString() + " ...");
-
             var frontier = new List<Node>();
             var visited = new List<Node>();
             frontier.Add(pos);
@@ -67,11 +105,17 @@ namespace Heureka
                 var node = RemoveCheapestNode(frontier, goal);
                 if (node.Equals(goal))
                     return RetrievePath(parent, goal);
+                if(node.GetEdges().Count == 0)
+                    foreach(var n in graph.nodes)
+                        if (n.Equals(node))
+                        {
+                            node = n;
+                            break;
+                        }
                 if (!visited.Contains(node))
                 {
                     visited.Add(node);
                     foreach(var edge in node.GetEdges())
-                    {
                         if (frontier.Contains(edge.end) && distance.ContainsKey(edge.end.ToString()))
                         {
                             if (edge.Length() < distance[edge.end.ToString()])
@@ -86,7 +130,6 @@ namespace Heureka
                                 parent[edge.end.ToString()] = node;
                             distance[edge.end.ToString()] = distance[edge.start.ToString()] + edge.Length();
                         }
-                    }
                 }
             }
             return null;
@@ -97,7 +140,6 @@ namespace Heureka
             var path = new List<Edge>();
             var node = goal;
             while (node != pos)
-            {
                 try
                 {
                     var p = parent[node.ToString()];
@@ -108,7 +150,6 @@ namespace Heureka
                     Console.WriteLine(e.StackTrace);
                     return new List<Edge>();
                 }
-            }
             path.Reverse();
             return path;
         }
@@ -117,7 +158,6 @@ namespace Heureka
         {
             var index = IndexOfCheapestNode(nodes, target);
             var node = nodes[index];
-            //Console.WriteLine("\nCheapest note is " + node + " with f(n)=" + (distance[node.ToString()] + node.EuclideanDistance(target)));
             nodes.RemoveAt(index);
             return node;
         }
@@ -143,16 +183,11 @@ namespace Heureka
         public Node SearchNode(int x, int y)
         {
             foreach (var node in graph.nodes)
-            {
                 if (node.x == x && node.y == y)
-                {
                     return node;
-                }
-            }
             return null;
         }
     }
-
 
     class GraphConstructor
     {
@@ -169,7 +204,6 @@ namespace Heureka
                     var start = new Node(Convert.ToDouble(keys[0]), Convert.ToDouble(keys[1]));
                     var end = new Node(Convert.ToDouble(keys[3]), Convert.ToDouble(keys[4]));
                     var edge = new Edge(start, end, keys[2]);
-                    //start.AddEdge(edge);
 
                     if (!line.Equals(lines[0]))
                     {
@@ -183,9 +217,7 @@ namespace Heureka
                                 n = node;
                             }
                             if (node.Equals(end))
-                            {
                                 addEnd = false;
-                            }
                         }
                         if (addStart)
                             graph.AddNode(start);
@@ -249,9 +281,7 @@ namespace Heureka
             this.x = x;
             this.y = y;
             if (edge != null)
-            {
                 AddEdge(edge);
-            }
         }
 
         public void AddEdge(Edge edge)
@@ -262,10 +292,8 @@ namespace Heureka
         public Edge GetEdgeToNode(Node node)
         {
             foreach(var edge in edges)
-            {
                 if (edge.end.Equals(node))
                     return edge;
-            }
             return null;
         }
 
@@ -308,15 +336,14 @@ namespace Heureka
             return (start.Equals(edge.start) && end.Equals(edge.end) && street.Equals(edge.street));
         }
 
-        public override string ToString()
-        {
-            //return start.ToString() + " " + street + " " + end.ToString();
-            return street;
-        }
-
         public double Length()
         {
             return start.EuclideanDistance(end);
+        }
+
+        public override string ToString()
+        {
+            return street;
         }
     }
 }
