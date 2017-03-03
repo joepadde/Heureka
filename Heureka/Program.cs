@@ -20,7 +20,7 @@ namespace Heureka
             var graph = GraphFromFile("C:/AI/manhattan.txt");
 
             // Where are we?
-            var pathfinder = new Pathfinder(graph, 9, 9);
+            var pathfinder = new Pathfinder(graph, graph.GetNodeFromStreetCross("street_6", "avenue_7"));
 
             // Where to?
             var route = GetRouteAsList(pathfinder, 0, 0);
@@ -83,6 +83,12 @@ namespace Heureka
         Graph graph;
         Node pos;
         Dictionary<string, double> distance = new Dictionary<string, double>();
+
+        public Pathfinder(Graph graph, Node node)
+        {
+            this.graph = graph;
+            pos = node;
+        }
 
         public Pathfinder(Graph graph, int x, int y)
         {
@@ -268,6 +274,19 @@ namespace Heureka
                 return true;
 
             return (nodes.Count == 0 || edges.Count == 0);
+        }
+
+        public Node GetNodeFromStreetCross(string one, string two)
+        {
+            foreach (var node in nodes)
+            {
+                int i = node.GetEdges().FindIndex(e => e.street == one);
+                int j = node.GetEdges().FindIndex(e => e.street == two);
+                if (i >= 0 && j >= 0)
+                    return node;
+            }
+
+            return null;
         }
     }
 
