@@ -11,6 +11,11 @@ using System.Threading.Tasks;
  * Asbjorn Kruuse, Nicklas Hansen
  */
 
+/*
+ * SEARCH STRING FOR UNIMPLEMENTED CODE:
+ * 'TO BE IMPLEMENTED'
+ */
+
 namespace Heureka
 {
     class Program
@@ -38,7 +43,7 @@ namespace Heureka
         static List<string> RoadFinding(Graph graph)
         {
             // Where are we?
-            var pathfinder = new Pathfinder(graph, graph.GetNodeFromEdgeIdentifiers("street_6", "avenue_7"));
+            var pathfinder = new AStar(graph, graph.GetNodeFromEdgeIdentifiers("street_6", "avenue_7"));
 
             // Where to?
             return Wrapper.GetRouteAsList(pathfinder, 0, 0);
@@ -46,8 +51,7 @@ namespace Heureka
 
         static List<string> InferenceEngine(Graph graph)
         {
-            // 
-
+            // TO BE IMPLEMENTED
             return new List<string>();
         }
 
@@ -111,26 +115,17 @@ namespace Heureka
     }
     #endregion
 
-    #region General Purpose
-    class Pathfinder
+    #region Inference
+    // TO BE IMPLEMENTED
+    #endregion
+
+    #region Search Algorithms
+    class AStar : Pathfinder
     {
-        Graph graph;
-        Node pos;
-        Dictionary<string, double> distance = new Dictionary<string, double>();
 
-        public Pathfinder(Graph graph, Node node)
-        {
-            this.graph = graph;
-            pos = node;
-        }
+        public AStar(Graph graph, Node node) : base(graph, node) { }
 
-        public Pathfinder(Graph graph, int x, int y)
-        {
-            this.graph = graph;
-            pos = SearchNode(x, y);
-        }
-
-        public List<Edge> Find(int x, int y)
+        public override List<Edge> Find(int x, int y)
         {
             var goal = SearchNode(x, y);
             Dictionary<string, Node> parent = new Dictionary<string, Node>();
@@ -139,14 +134,14 @@ namespace Heureka
             var frontier = new List<Node>();
             var visited = new List<Node>();
             frontier.Add(pos);
-            distance[pos.ToString()] = 0;
-            while(frontier.Count > 0)
+            properties.distance[pos.ToString()] = 0;
+            while (frontier.Count > 0)
             {
                 var node = RemoveCheapestNode(frontier, goal);
                 if (node.Equals(goal))
                     return RetrievePath(parent, goal);
-                if(node.GetEdges().Count == 0)
-                    foreach(var n in graph.nodes)
+                if (node.GetEdges().Count == 0)
+                    foreach (var n in graph.nodes)
                         if (n.Equals(node))
                         {
                             node = n;
@@ -155,20 +150,21 @@ namespace Heureka
                 if (!visited.Contains(node))
                 {
                     visited.Add(node);
-                    foreach(var edge in node.GetEdges())
-                        if (frontier.Contains(edge.end) && distance.ContainsKey(edge.end.ToString()))
+                    foreach (var edge in node.GetEdges())
+                        if (frontier.Contains(edge.end) && properties.distance.ContainsKey(edge.end.ToString()))
                         {
-                            if (edge.Length() < distance[edge.end.ToString()])
+                            if (edge.Length() < properties.distance[edge.end.ToString()])
                             {
                                 parent[edge.end.ToString()] = node;
-                                distance[edge.end.ToString()] = distance[edge.start.ToString()] + edge.Length();
+                                properties.distance[edge.end.ToString()] = properties.distance[edge.start.ToString()] + edge.Length();
                             }
-                        } else
+                        }
+                        else
                         {
                             frontier.Add(edge.end);
                             if (!parent.ContainsKey(edge.end.ToString()))
                                 parent[edge.end.ToString()] = node;
-                            distance[edge.end.ToString()] = distance[edge.start.ToString()] + edge.Length();
+                            properties.distance[edge.end.ToString()] = properties.distance[edge.start.ToString()] + edge.Length();
                         }
                 }
             }
@@ -185,7 +181,8 @@ namespace Heureka
                     var p = parent[node.ToString()];
                     path.Add(p.GetEdgeToNode(node));
                     node = p;
-                } catch (Exception e)
+                }
+                catch (Exception e)
                 {
                     Console.WriteLine(e.StackTrace);
                     return new List<Edge>();
@@ -206,10 +203,10 @@ namespace Heureka
         {
             double cost = -1;
             int index = 0;
-            for(int i = 0; i < nodes.Count; i++)
+            for (int i = 0; i < nodes.Count; i++)
             {
                 var euclidean = nodes[i].EuclideanDistance(target);
-                var distance = this.distance[nodes[i].ToString()];
+                var distance = properties.distance[nodes[i].ToString()];
                 var total = euclidean + distance;
                 if (total < cost || cost == -1)
                 {
@@ -219,6 +216,45 @@ namespace Heureka
             }
             return index;
         }
+    }
+
+    class RBFS : Pathfinder
+    {
+        public RBFS(Graph graph, Node node) : base(graph, node) { }
+
+        public override List<Edge> Find(int x, int y)
+        {   
+            // TO BE IMPLEMENTED
+            throw new NotImplementedException();
+        }
+    }
+
+    #endregion
+
+    #region General Purpose
+    abstract class Pathfinder
+    {
+        protected Graph graph;
+        protected Node pos;
+        protected dynamic properties = new ExpandoObject();
+
+        public Pathfinder(Graph graph, Node node)
+        {
+            Init(graph);
+            pos = node;
+        }
+
+        public Pathfinder(Graph graph, int x, int y)
+        {
+            Init(graph);
+            pos = SearchNode(x, y);
+        }
+
+        protected void Init(Graph graph)
+        {
+            this.graph = graph;
+            properties.distance = new Dictionary<string, double>();
+        }
 
         public Node SearchNode(int x, int y)
         {
@@ -227,6 +263,8 @@ namespace Heureka
                     return node;
             return null;
         }
+
+        public abstract List<Edge> Find(int x, int y);
     }
 
     class GraphConstructor
