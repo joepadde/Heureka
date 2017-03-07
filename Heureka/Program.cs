@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -17,24 +18,44 @@ namespace Heureka
         static void Main(string[] args)
         {
             // Constructs a new graph from specified file
-            var graph = GraphFromFile("C:/AI/manhattan.txt");
+            var graph = Wrapper.GraphFromFile("C:/AI/manhattan.txt");
 
-            // Where are we?
-            var pathfinder = new Pathfinder(graph, graph.GetNodeFromStreetCross("street_6", "avenue_7"));
+            // Solves the Road Finding Problem
+            var route = RoadFinding(graph);
 
-            // Where to?
-            var route = GetRouteAsList(pathfinder, 0, 0);
+            // Solves the Inference Problem
+            //var route = InferenceEngine(graph);
 
             // Print route to Console (optionally file)
+            //var filepath = "";
             var filepath = "C:/Users/nickl/Desktop/route.txt";
-            PrintRoute(route, filepath);
+            Wrapper.PrintRoute(route, filepath);
 
             // If printing to file, open it, else leave Console open
-            OpenFileIfExists(filepath);
+            Wrapper.OpenFileIfExists(filepath);
         }
 
-        #region Helper Functions
+        static List<string> RoadFinding(Graph graph)
+        {
+            // Where are we?
+            var pathfinder = new Pathfinder(graph, graph.GetNodeFromEdgeIdentifiers("street_6", "avenue_7"));
 
+            // Where to?
+            return Wrapper.GetRouteAsList(pathfinder, 0, 0);
+        }
+
+        static List<string> InferenceEngine(Graph graph)
+        {
+            // 
+
+            return new List<string>();
+        }
+
+    }
+
+    #region Wrapper
+    static class Wrapper
+    {
         public static Graph GraphFromFile(string file)
         {
             var constructor = new GraphConstructor(file);
@@ -43,13 +64,16 @@ namespace Heureka
 
         public static void PrintRoute(List<String> route, string filepath = null)
         {
-            foreach(var street in route)
+            if (route == null)
+                return;
+            foreach (var street in route)
                 Console.WriteLine(street);
             if (!String.IsNullOrEmpty(filepath))
                 try
                 {
                     System.IO.File.WriteAllLines(filepath, route);
-                } catch (Exception e)
+                }
+                catch (Exception e)
                 {
                     Console.WriteLine("\nERROR: Could not write to file");
                 }
@@ -61,7 +85,7 @@ namespace Heureka
             var path = pathfinder.Find(x, y);
             if (path != null)
                 foreach (var edge in path)
-                    route.Add(edge.street);
+                    route.Add(edge.properties.identifier);
             else
                 route.Add("Destination cannot be reached!");
             return route;
@@ -74,10 +98,20 @@ namespace Heureka
             else
                 Console.ReadKey();
         }
-
-        #endregion
     }
+    #endregion
 
+    #region Route Finding
+    class Road : Edge
+    {
+        public Road(Node start, Node end, string street) : base(start, end)
+        {
+            properties.identifier = street;
+        }
+    }
+    #endregion
+
+    #region General Purpose
     class Pathfinder
     {
         Graph graph;
@@ -209,7 +243,7 @@ namespace Heureka
                 {
                     var start = new Node(Convert.ToDouble(keys[0]), Convert.ToDouble(keys[1]));
                     var end = new Node(Convert.ToDouble(keys[3]), Convert.ToDouble(keys[4]));
-                    var edge = new Edge(start, end, keys[2]);
+                    var edge = new Road(start, end, keys[2]);
 
                     if (!line.Equals(lines[0]))
                     {
@@ -276,12 +310,12 @@ namespace Heureka
             return (nodes.Count == 0 || edges.Count == 0);
         }
 
-        public Node GetNodeFromStreetCross(string one, string two)
+        public Node GetNodeFromEdgeIdentifiers(string one, string two)
         {
             foreach (var node in nodes)
             {
-                int i = node.GetEdges().FindIndex(e => e.street == one);
-                int j = node.GetEdges().FindIndex(e => e.street == two);
+                int i = node.GetEdges().FindIndex(e => e.properties.identifier == one);
+                int j = node.GetEdges().FindIndex(e => e.properties.identifier == two);
                 if (i >= 0 && j >= 0)
                     return node;
             }
@@ -294,6 +328,7 @@ namespace Heureka
     {
         public double x, y;
         protected List<Edge> edges = new List<Edge>();
+        public dynamic properties = new ExpandoObject();
 
         public Node(double x, double y, Edge edge = null)
         {
@@ -341,18 +376,18 @@ namespace Heureka
     {
         public Node start;
         public Node end;
-        public string street;
+        public dynamic properties = new ExpandoObject();
 
-        public Edge(Node start, Node end, string street)
+        public Edge(Node start, Node end)
         {
             this.start = start;
             this.end = end;
-            this.street = street;
+            properties.identifier = Guid.NewGuid().ToString();
         }
 
         public bool Equals(Edge edge)
         {
-            return (start.Equals(edge.start) && end.Equals(edge.end) && street.Equals(edge.street));
+            return (start.Equals(edge.start) && end.Equals(edge.end) && properties.identifier.Equals(edge.properties.identifier));
         }
 
         public double Length()
@@ -362,7 +397,9 @@ namespace Heureka
 
         public override string ToString()
         {
-            return street;
+            return properties.identifier;
         }
     }
+    #endregion
+
 }
