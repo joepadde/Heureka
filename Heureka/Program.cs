@@ -25,34 +25,28 @@ namespace Heureka
             // Constructs a new graph from specified file
             var graph = Wrapper.GraphFromFile("C:/AI/manhattan.txt");
 
-            // Solves the Road Finding Problem
-            var route = RoadFinding(graph);
+            // Solves the Route Finding problem
+            var solution = Solve(graph, "street_6", "avenue_7");
 
             // Solves the Inference Problem
-            //var route = InferenceEngine(graph);
+            //var solution = Solve(graph, "a", "b");
 
             // Print route to Console (optionally file)
             //var filepath = "";
             var filepath = "C:/Users/nickl/Desktop/route.txt";
-            Wrapper.PrintRoute(route, filepath);
+            Wrapper.Print(solution, filepath);
 
             // If printing to file, open it, else leave Console open
             Wrapper.OpenFileIfExists(filepath);
         }
 
-        static List<string> RoadFinding(Graph graph)
+        static List<string> Solve(Graph graph, string edge1, string edge2)
         {
             // Where are we?
-            var pathfinder = new AStar(graph, graph.GetNodeFromEdgeIdentifiers("street_6", "avenue_7"));
+            var pathfinder = new AStar(graph, graph.GetNodeFromEdgeIdentifiers(edge1, edge2));
 
             // Where to?
             return Wrapper.GetRouteAsList(pathfinder, 0, 0);
-        }
-
-        static List<string> InferenceEngine(Graph graph)
-        {
-            // TO BE IMPLEMENTED
-            return new List<string>();
         }
 
     }
@@ -66,7 +60,7 @@ namespace Heureka
             return constructor.getGraph();
         }
 
-        public static void PrintRoute(List<String> route, string filepath = null)
+        public static void Print(List<String> route, string filepath = null)
         {
             if (route == null)
                 return;
@@ -123,7 +117,7 @@ namespace Heureka
     class AStar : Pathfinder
     {
 
-        public AStar(Graph graph, Node node) : base(graph, node) { }
+        public AStar(Graph graph, Node node = null, int? x = null, int? y = null, string id = null) : base(graph, node, x, y, id) { }
 
         public override List<Edge> Find(int x, int y)
         {
@@ -238,22 +232,34 @@ namespace Heureka
         protected Node pos;
         protected dynamic properties = new ExpandoObject();
 
-        public Pathfinder(Graph graph, Node node)
+        public Pathfinder(Graph graph, Node node = null, int? x = null, int? y = null, string id = null)
         {
             Init(graph);
-            pos = node;
-        }
-
-        public Pathfinder(Graph graph, int x, int y)
-        {
-            Init(graph);
-            pos = SearchNode(x, y);
+            if (node != null)
+                pos = node;
+            else if (x.HasValue && y.HasValue)
+                pos = SearchNode(x.Value, y.Value);
+            else
+                pos = SearchNode("id", id);
         }
 
         protected void Init(Graph graph)
         {
             this.graph = graph;
             properties.distance = new Dictionary<string, double>();
+        }
+
+        public Node SearchNode(string property, string str)
+        {
+            foreach (var node in graph.nodes)
+                try
+                {
+                    var res = node.properties.GetType().GetProperty(property).GetValue(node.properties, null);
+                    if (res.equals(str))
+                        return node;
+                }
+                catch (Exception e) { }
+            return null;
         }
 
         public Node SearchNode(int x, int y)
@@ -265,6 +271,7 @@ namespace Heureka
         }
 
         public abstract List<Edge> Find(int x, int y);
+
     }
 
     class GraphConstructor
@@ -277,12 +284,20 @@ namespace Heureka
             foreach(var line in lines)
             {
                 var keys = line.Split(' ');
+                Node start = null, end = null;
+                Edge edge = null;
                 if (keys.Length == 5)
                 {
-                    var start = new Node(Convert.ToDouble(keys[0]), Convert.ToDouble(keys[1]));
-                    var end = new Node(Convert.ToDouble(keys[3]), Convert.ToDouble(keys[4]));
-                    var edge = new Road(start, end, keys[2]);
-
+                    start = new Node(Convert.ToDouble(keys[0]), Convert.ToDouble(keys[1]));
+                    end = new Node(Convert.ToDouble(keys[3]), Convert.ToDouble(keys[4]));
+                    edge = new Road(start, end, keys[2]);
+                } else if (keys.Length == 3)
+                {
+                    start = new Node(id: keys[0]);
+                    end = new Node(id: keys[2]);
+                    edge = new Road(start, end, keys[1]);
+                }
+                if (start != null && end != null && edge != null)
                     if (!line.Equals(lines[0]))
                     {
                         bool addStart = true, addEnd = true;
@@ -311,8 +326,6 @@ namespace Heureka
                         graph.AddNode(end);
                         graph.AddEdge(edge);
                     }
-                }
-                
             }
         }
 
@@ -368,10 +381,17 @@ namespace Heureka
         protected List<Edge> edges = new List<Edge>();
         public dynamic properties = new ExpandoObject();
 
-        public Node(double x, double y, Edge edge = null)
+        public Node(double? x = null, double? y = null, string id = null, Edge edge = null)
         {
-            this.x = x;
-            this.y = y;
+            if (x.HasValue && y.HasValue)
+            {
+                this.x = x.Value;
+                this.y = y.Value;
+            }
+            else if (!String.IsNullOrEmpty(id))
+                properties.identifier = id;
+            else
+                properties.identifier = Guid.NewGuid();
             if (edge != null)
                 AddEdge(edge);
         }
