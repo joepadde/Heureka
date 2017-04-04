@@ -110,7 +110,15 @@ namespace Heureka
     #endregion
 
     #region Inference
-    // TO BE IMPLEMENTED
+    class Clause : Node
+    {
+        int? dist;
+
+        public Clause(string id, int? dist = null) : base(null, null, id, null)
+        {
+            this.dist = dist;
+        }
+    }
     #endregion
 
     #region Search Algorithms
@@ -222,7 +230,6 @@ namespace Heureka
             throw new NotImplementedException();
         }
     }
-
     #endregion
 
     #region General Purpose
