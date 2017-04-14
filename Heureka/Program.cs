@@ -22,14 +22,17 @@ namespace Heureka
     {
         static void Main(string[] args)
         {
+            //RouteFinding();
+            Inference();
+        }
+
+        static void RouteFinding()
+        {
             // Constructs a new graph from specified file
-            var graph = Wrapper.GraphFromFile("C:/AI/manhattan.txt");
+            var graph = Wrapper.MapFromFile("C:/AI/manhattan.txt");
 
             // Solves the Route Finding problem
             var solution = Solve(graph, "street_6", "avenue_7");
-
-            // Solves the Inference Problem
-            //var solution = Solve(graph, "a", "b");
 
             // Print route to Console (optionally file)
             //var filepath = "";
@@ -38,6 +41,29 @@ namespace Heureka
 
             // If printing to file, open it, else leave Console open
             Wrapper.OpenFileIfExists(filepath);
+        }
+
+        static void Inference()
+        {
+            var engine = Wrapper.EngineFromFile("C:/AI/inference.txt");
+
+            var clause = "a";
+
+            if (engine.Validate(clause))
+                Console.WriteLine("VALID");
+            else
+                Console.WriteLine("UNPROVEN");
+
+            //var solution = new List<string>() { "solution" };
+
+            //// Print route to Console (optionally file)
+            //var filepath = "";
+            ////var filepath = "C:/Users/nickl/Desktop/route.txt";
+            //Wrapper.Print(solution, filepath);
+
+            //// If printing to file, open it, else leave Console open
+            //Wrapper.OpenFileIfExists(filepath);
+            Console.ReadKey();
         }
 
         static List<string> Solve(Graph graph, string edge1, string edge2)
@@ -54,10 +80,16 @@ namespace Heureka
     #region Wrapper
     static class Wrapper
     {
-        public static Graph GraphFromFile(string file)
+        public static Graph MapFromFile(string file)
         {
-            var constructor = new GraphConstructor(file);
+            var constructor = new MapReader(file);
             return constructor.getGraph();
+        }
+
+        public static InferenceEngine EngineFromFile(string file)
+        {
+            var engine = new InferenceEngine(file);
+            return engine;
         }
 
         public static void Print(List<String> route, string filepath = null)
@@ -80,7 +112,7 @@ namespace Heureka
         public static List<String> GetRouteAsList(Pathfinder pathfinder, int x, int y)
         {
             var route = new List<String>();
-            var path = pathfinder.Find(x, y);
+            var path = pathfinder.Find(x, y, null);
             if (path != null)
                 foreach (var edge in path)
                     route.Add(edge.properties.identifier);
@@ -107,6 +139,12 @@ namespace Heureka
             properties.identifier = street;
         }
     }
+
+    class MapReader : GraphConstructor
+    {
+        public MapReader(string filepath) : base(filepath) { }
+    }
+
     #endregion
 
     #region Inference
@@ -114,11 +152,101 @@ namespace Heureka
     {
         int? dist;
 
-        public Clause(string id, int? dist = null) : base(null, null, id, null)
+        public Clause(string id, int? dist = null) : base(id : id)
         {
             this.dist = dist;
         }
     }
+
+    class InferenceEngine : GraphConstructor
+    {
+        public InferenceEngine(string filepath) : base(null)
+        {
+            properties.emptyclause = new Clause(Guid.NewGuid().ToString(), 0);
+            string[] lines = System.IO.File.ReadAllLines(filepath);
+            foreach (var line in lines)
+            {
+                Console.WriteLine("\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+                var keys = line.Split(' ');
+                if (keys.Length == 1 && !String.IsNullOrEmpty(keys[0]))
+                {
+                    var clause = AddClause(keys[0]);
+                    AddEdgeToEmpty(clause);
+                }
+                else if (keys.Length > 1)
+                {
+                    var target = AddClause(keys[0]);
+                    for(int i = 2; i < keys.Length; i++)
+                    {
+                        var clause = AddClause(keys[i]);
+                        var edge = new Edge(target, clause);
+                        target.AddEdge(edge);
+                    }
+                }
+                foreach (var n in graph.nodes)
+                {
+                    Console.WriteLine(n.properties.identifier.ToString());
+                    foreach (var e in n.GetEdges())
+                    {
+                        var prop = e.end.properties.identifier.ToString();
+                        var id = (prop != properties.emptyclause.properties.identifier.ToString()) ? prop : "E" ;
+                        Console.WriteLine("- " + id);
+                    }
+                    Console.WriteLine();
+                }
+            }
+        }
+
+        public bool Validate(string line)
+        {
+            var keys = line.Split(' ');
+
+            if (keys.Length > 0)
+            {
+                var clause = GetClauseIfExists(keys[0]);
+                if (clause != null)
+                {
+                    var pathfinder = new AStar(graph, clause);
+                    var path = pathfinder.Find(clause:clause);
+                    return (path != null);
+                }
+            }
+            return false;
+        }
+
+        public Clause GetClauseIfExists(string id)
+        {
+            var index = graph.nodes.FindIndex(e => e.properties.identifier == id);
+            return (index >= 0) ? (Clause)graph.nodes[index] : null;
+        }
+
+        public Clause AddClause(string id)
+        {
+            var clause = GetClauseIfExists(id);
+            if (clause == null)
+            {
+                clause = new Clause(id);
+                graph.AddNode(clause);
+            }
+            return clause;
+        }
+
+        public void AddEdgeToEmpty(Clause clause)
+        {
+            var edge = GetEmptyEdgeIfExists(clause);
+            if (edge == null)
+            {
+                clause.AddEdge(new Edge(clause, properties.emptyclause));
+            }
+        }
+
+        public Edge GetEmptyEdgeIfExists(Clause clause)
+        {
+            return clause.GetEdgeToNode(properties.emptyclause);
+        }
+
+    }
+
     #endregion
 
     #region Search Algorithms
@@ -127,7 +255,7 @@ namespace Heureka
 
         public AStar(Graph graph, Node node = null, int? x = null, int? y = null, string id = null) : base(graph, node, x, y, id) { }
 
-        public override List<Edge> Find(int x, int y)
+        public override List<Edge> Find(int x = 0, int y = 0, Clause clause = null)
         {
             var goal = SearchNode(x, y);
             Dictionary<string, Node> parent = new Dictionary<string, Node>();
@@ -224,7 +352,7 @@ namespace Heureka
     {
         public RBFS(Graph graph, Node node) : base(graph, node) { }
 
-        public override List<Edge> Find(int x, int y)
+        public override List<Edge> Find(int x = 0, int y = 0, Clause clause = null)
         {   
             // TO BE IMPLEMENTED
             throw new NotImplementedException();
@@ -277,16 +405,20 @@ namespace Heureka
             return null;
         }
 
-        public abstract List<Edge> Find(int x, int y);
+        public abstract List<Edge> Find(int x, int y, Clause clause);
 
     }
 
-    class GraphConstructor
+    abstract class GraphConstructor
     {
         protected Graph graph = new Graph();
+        protected dynamic properties = new ExpandoObject();
 
         public GraphConstructor(string filepath)
         {
+            if (filepath == null)
+                return;
+
             string[] lines = System.IO.File.ReadAllLines(filepath);
             foreach(var line in lines)
             {
