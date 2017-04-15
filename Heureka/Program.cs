@@ -150,11 +150,11 @@ namespace Heureka
     #region Inference
     class Clause : Node
     {
-        int? dist;
 
         public Clause(string id, int? dist = null) : base(id : id)
         {
-            this.dist = dist;
+            if (dist.HasValue)
+                properties.distance = dist.Value;
         }
     }
 
@@ -207,7 +207,7 @@ namespace Heureka
                 if (clause != null)
                 {
                     var pathfinder = new AStar(graph, clause);
-                    var path = pathfinder.Find(clause:clause);
+                    var path = pathfinder.Find(clause:properties.emptyclause);
                     return (path != null);
                 }
             }
@@ -257,14 +257,18 @@ namespace Heureka
 
         public override List<Edge> Find(int x = 0, int y = 0, Clause clause = null)
         {
-            var goal = SearchNode(x, y);
+            var inf = (clause != null);
+            var goal = (inf) ? clause : SearchNode(x, y);
             Dictionary<string, Node> parent = new Dictionary<string, Node>();
             if (graph.isNullOrEmpty() || pos == null || goal == null)
                 return null;
             var frontier = new List<Node>();
             var visited = new List<Node>();
             frontier.Add(pos);
-            properties.distance[pos.ToString()] = 0;
+            if (inf)
+                pos.properties.distance = 0;
+            else
+                properties.distance[pos.ToString()] = 0;
             while (frontier.Count > 0)
             {
                 var node = RemoveCheapestNode(frontier, goal);
@@ -281,7 +285,7 @@ namespace Heureka
                 {
                     visited.Add(node);
                     foreach (var edge in node.GetEdges())
-                        if (frontier.Contains(edge.end) && properties.distance.ContainsKey(edge.end.ToString()))
+                        if (frontier.Contains(edge.end) && (properties.distance.ContainsKey(edge.end.ToString())))
                         {
                             if (edge.Length() < properties.distance[edge.end.ToString()])
                             {
