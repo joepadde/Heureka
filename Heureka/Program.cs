@@ -47,7 +47,7 @@ namespace Heureka
         {
             var engine = Wrapper.EngineFromFile("C:/AI/inference.txt");
 
-            var clause = "a";
+            var clause = "b";
 
             if (engine.Validate(clause))
                 Console.WriteLine("VALID");
@@ -150,7 +150,6 @@ namespace Heureka
     #region Inference
     class Clause : Node
     {
-
         public Clause(string id, int? dist = null) : base(id : id)
         {
             if (dist.HasValue)
@@ -178,9 +177,13 @@ namespace Heureka
                     var target = AddClause(keys[0]);
                     for(int i = 2; i < keys.Length; i++)
                     {
-                        var clause = AddClause(keys[i]);
-                        var edge = new Edge(target, clause);
-                        target.AddEdge(edge);
+                        if (keys[i] != keys[0])
+                        {
+                            var clause = AddClause(keys[i]);
+                            var edge = new Edge(target, clause);
+                            edge.properties.clause = true;
+                            graph.AddEdge(edge);
+                        }
                     }
                 }
                 foreach (var n in graph.nodes)
@@ -189,7 +192,7 @@ namespace Heureka
                     foreach (var e in n.GetEdges())
                     {
                         var prop = e.end.properties.identifier.ToString();
-                        var id = (prop != properties.emptyclause.properties.identifier.ToString()) ? prop : "E" ;
+                        var id = (prop != properties.emptyclause.properties.identifier.ToString()) ? prop : "E";
                         Console.WriteLine("- " + id);
                     }
                     Console.WriteLine();
@@ -200,7 +203,6 @@ namespace Heureka
         public bool Validate(string line)
         {
             var keys = line.Split(' ');
-
             if (keys.Length > 0)
             {
                 var clause = GetClauseIfExists(keys[0]);
@@ -236,7 +238,9 @@ namespace Heureka
             var edge = GetEmptyEdgeIfExists(clause);
             if (edge == null)
             {
-                clause.AddEdge(new Edge(clause, properties.emptyclause));
+                edge = new Edge(clause, properties.emptyclause);
+                edge.properties.clause = true;
+                graph.AddEdge(edge);
             }
         }
 
@@ -265,10 +269,7 @@ namespace Heureka
             var frontier = new List<Node>();
             var visited = new List<Node>();
             frontier.Add(pos);
-            if (inf)
-                pos.properties.distance = 0;
-            else
-                properties.distance[pos.ToString()] = 0;
+            pos.properties.distance = 0;
             while (frontier.Count > 0)
             {
                 var node = RemoveCheapestNode(frontier, goal);
@@ -285,12 +286,12 @@ namespace Heureka
                 {
                     visited.Add(node);
                     foreach (var edge in node.GetEdges())
-                        if (frontier.Contains(edge.end) && (properties.distance.ContainsKey(edge.end.ToString())))
+                        if (frontier.Contains(edge.end) && edge.end.properties.distance != null)
                         {
-                            if (edge.Length() < properties.distance[edge.end.ToString()])
+                            if (edge.Length() < edge.end.properties.distance)
                             {
                                 parent[edge.end.ToString()] = node;
-                                properties.distance[edge.end.ToString()] = properties.distance[edge.start.ToString()] + edge.Length();
+                                edge.end.properties.distance = edge.start.properties.distance + edge.Length();
                             }
                         }
                         else
@@ -298,7 +299,7 @@ namespace Heureka
                             frontier.Add(edge.end);
                             if (!parent.ContainsKey(edge.end.ToString()))
                                 parent[edge.end.ToString()] = node;
-                            properties.distance[edge.end.ToString()] = properties.distance[edge.start.ToString()] + edge.Length();
+                            edge.end.properties.distance = edge.start.properties.distance + edge.Length();
                         }
                 }
             }
@@ -340,7 +341,7 @@ namespace Heureka
             for (int i = 0; i < nodes.Count; i++)
             {
                 var euclidean = nodes[i].EuclideanDistance(target);
-                var distance = properties.distance[nodes[i].ToString()];
+                var distance = nodes[i].properties.distance;
                 var total = euclidean + distance;
                 if (total < cost || cost == -1)
                 {
@@ -564,7 +565,7 @@ namespace Heureka
 
         public bool Equals(Node node)
         {
-            return (x == node.x && y == node.y);
+            return (x == node.x && y == node.y && properties.identifier == node.properties.identifier);
         }
 
         public override string ToString()
@@ -593,7 +594,7 @@ namespace Heureka
 
         public double Length()
         {
-            return start.EuclideanDistance(end);
+            return (properties.clause == null) ? start.EuclideanDistance(end) : start.properties.distance + 1;
         }
 
         public override string ToString()
