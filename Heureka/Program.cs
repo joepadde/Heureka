@@ -193,7 +193,15 @@ namespace Heureka
                     {
                         var prop = e.end.properties.identifier.ToString();
                         var id = (prop != properties.emptyclause.properties.identifier.ToString()) ? prop : "E";
-                        Console.WriteLine("- " + id);
+                        var str = "";
+                        //if (e.end.GetEdges().Count > 0)
+                        //{
+                        //    str = " ( ";
+                        //    foreach (var edge in e.end.GetEdges())
+                        //        str = str + edge.end.properties.identifier.ToString() + " ";
+                        //    str = str + ")";
+                        //}
+                        Console.WriteLine("- " + id + str);
                     }
                     Console.WriteLine();
                 }
@@ -274,7 +282,12 @@ namespace Heureka
             {
                 var node = RemoveCheapestNode(frontier, goal);
                 if (node.Equals(goal))
-                    return RetrievePath(parent, goal);
+                {
+                    if (inf)
+                        return new List<Edge>();
+                    else
+                        return RetrievePath(parent, goal);
+                }
                 if (node.GetEdges().Count == 0)
                     foreach (var n in graph.nodes)
                         if (n.Equals(node))
