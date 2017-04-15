@@ -16,6 +16,10 @@ using System.Threading.Tasks;
  * 'TO BE IMPLEMENTED'
  */
 
+/*
+ * NOTE TO SELF: USE HEURISTIC FOR CLAUSES
+ */
+
 namespace Heureka
 {
     class Program
@@ -53,8 +57,6 @@ namespace Heureka
                 Console.WriteLine("VALID");
             else
                 Console.WriteLine("UNPROVEN");
-
-            //var solution = new List<string>() { "solution" };
 
             //// Print route to Console (optionally file)
             //var filepath = "";
@@ -256,7 +258,6 @@ namespace Heureka
         {
             return clause.GetEdgeToNode(properties.emptyclause);
         }
-
     }
 
     #endregion
@@ -264,7 +265,6 @@ namespace Heureka
     #region Search Algorithms
     class AStar : Pathfinder
     {
-
         public AStar(Graph graph, Node node = null, int? x = null, int? y = null, string id = null) : base(graph, node, x, y, id) { }
 
         public override List<Edge> Find(int x = 0, int y = 0, Clause clause = null)
