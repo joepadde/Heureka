@@ -26,8 +26,8 @@ namespace Heureka
     {
         static void Main(string[] args)
         {
-            //RouteFinding();
-            Inference();
+            RouteFinding();
+            //Inference();
         }
 
         static void RouteFinding()
@@ -299,7 +299,7 @@ namespace Heureka
                 {
                     visited.Add(node);
                     foreach (var edge in node.GetEdges())
-                        if (frontier.Contains(edge.end) && edge.end.properties.distance != null)
+                        if (frontier.Contains(edge.end) && edge.end.HasProperty("distance"))
                         {
                             if (edge.Length() < edge.end.properties.distance)
                             {
@@ -312,7 +312,10 @@ namespace Heureka
                             frontier.Add(edge.end);
                             if (!parent.ContainsKey(edge.end.ToString()))
                                 parent[edge.end.ToString()] = node;
-                            edge.end.properties.distance = edge.start.properties.distance + edge.Length();
+                            if (edge.start.HasProperty("distance"))
+                                edge.end.properties.distance = edge.start.properties.distance + edge.Length();
+                            else
+                                edge.end.properties.distance = edge.Length();
                         }
                 }
             }
@@ -578,7 +581,20 @@ namespace Heureka
 
         public bool Equals(Node node)
         {
-            return (x == node.x && y == node.y && properties.identifier == node.properties.identifier);
+            if (HasIdentifier() && node.HasIdentifier())
+                return (properties.identifier == node.properties.identifier);
+            else
+                return (x == node.x && y == node.y);
+        }
+
+        public bool HasIdentifier()
+        {
+            return (properties.GetType().GetProperty("identifier") != null);
+        }
+
+        public bool HasProperty(string property)
+        {
+            return (properties.GetType().GetProperty(property) != null);
         }
 
         public override string ToString()
@@ -607,7 +623,12 @@ namespace Heureka
 
         public double Length()
         {
-            return (properties.clause == null) ? start.EuclideanDistance(end) : start.properties.distance + 1;
+            return (!HasProperty("clause")) ? start.EuclideanDistance(end) : start.properties.distance + 1;
+        }
+
+        public bool HasProperty(string property)
+        {
+            return (properties.GetType().GetProperty(property) != null);
         }
 
         public override string ToString()
