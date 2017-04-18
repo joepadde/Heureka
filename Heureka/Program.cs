@@ -167,7 +167,7 @@ namespace Heureka
             string[] lines = System.IO.File.ReadAllLines(filepath);
             foreach (var line in lines)
             {
-                Console.WriteLine("\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+                Console.WriteLine("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
                 var keys = line.Split(' ');
                 if (keys.Length == 1 && !String.IsNullOrEmpty(keys[0]))
                 {
@@ -192,8 +192,6 @@ namespace Heureka
                     if (group.Count > 0)
                         target.properties.group.Add(group);
                 }
-                for(int i = 0; i < 2; i++)
-                    UpdateHeuristics();
                 foreach (var n in graph.nodes)
                 {
                     var str = n.properties.identifier.ToString() + " (d:" + n.properties.heuristic + ")  ";
@@ -251,6 +249,7 @@ namespace Heureka
                 clause.properties.heuristic = 2; // fix this value
                 graph.AddNode(clause);
             }
+            UpdateHeuristics();
             return clause;
         }
 
@@ -273,9 +272,14 @@ namespace Heureka
 
         public void UpdateHeuristics()
         {
-            foreach(var edge in graph.edges)
+            foreach (var edge in graph.edges)
+            {
+                if (edge.end.properties.heuristic + 1 < edge.start.properties.heuristic)
+                    edge.start.properties.heuristic = edge.end.properties.heuristic + 1;
+
                 if (edge.end.properties.heuristic >= edge.start.properties.heuristic)
                     edge.start.properties.heuristic = edge.end.properties.heuristic + 1;
+            }
         }
     }
 
@@ -317,6 +321,9 @@ namespace Heureka
                 if (!visited.Contains(node))
                 {
                     visited.Add(node);
+
+                    // Grouped Search Implemented Here
+
                     foreach (var edge in node.GetEdges())
                         if (frontier.Contains(edge.end) && edge.end.HasProperty("distance"))
                         {
