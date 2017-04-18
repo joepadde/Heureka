@@ -160,6 +160,8 @@ namespace Heureka
 
     class InferenceEngine : GraphConstructor
     {
+        const int UNPROVEN_DISTANCE = int.MaxValue - 1;
+
         public InferenceEngine(string filepath) : base(null)
         {
             properties.emptyclause = new Clause(Guid.NewGuid().ToString());
@@ -194,7 +196,8 @@ namespace Heureka
                 }
                 foreach (var n in graph.nodes)
                 {
-                    var str = n.properties.identifier.ToString() + " (d:" + n.properties.heuristic + ")  ";
+                    var proven = (AttemptProof((Clause)n)) ? ", proven" : "";
+                    var str = n.properties.identifier.ToString() + " (d:" + n.properties.heuristic + "" + proven + ")  ";
                     if (n.properties.group.Count > 0)
                         foreach (var g in n.properties.group)
                         {
@@ -223,15 +226,20 @@ namespace Heureka
                 var clause = GetClauseIfExists(keys[0]);
                 if (clause != null)
                 {
-                    var pathfinder = new AStar(graph, clause);
-                    var path = pathfinder.Find(clause:properties.emptyclause);
-                    var result = (path != null);
-                    if (result)
-                        return (path.Count > 0);
-                    return result;
+                    return Validate(clause);
                 }
             }
             return false;
+        }
+
+        public bool Validate(Clause clause)
+        {
+            var pathfinder = new AStar(graph, clause);
+            var path = pathfinder.Find(clause:properties.emptyclause);
+            var result = (path != null);
+            if (result)
+                return (path.Count > 0);
+            return result;
         }
 
         public Clause GetClauseIfExists(string id)
@@ -246,10 +254,11 @@ namespace Heureka
             if (clause == null)
             {
                 clause = new Clause(id);
-                clause.properties.heuristic = 2; // fix this value
+                clause.properties.heuristic = UNPROVEN_DISTANCE; // fix this value
                 graph.AddNode(clause);
             }
             UpdateHeuristics();
+            AttemptProof(clause);
             return clause;
         }
 
@@ -262,6 +271,7 @@ namespace Heureka
                 edge.properties.clause = true;
                 edge.start.properties.heuristic = 1;
                 graph.AddEdge(edge);
+                AttemptProof(clause);
             }
         }
 
@@ -277,9 +287,23 @@ namespace Heureka
                 if (edge.end.properties.heuristic + 1 < edge.start.properties.heuristic)
                     edge.start.properties.heuristic = edge.end.properties.heuristic + 1;
 
-                if (edge.end.properties.heuristic >= edge.start.properties.heuristic)
+                if (edge.end.properties.heuristic >= edge.start.properties.heuristic && edge.end.properties.heuristic != UNPROVEN_DISTANCE)
                     edge.start.properties.heuristic = edge.end.properties.heuristic + 1;
             }
+        }
+
+        public bool AttemptProof(Clause clause)
+        {
+            if (clause.GetEdges().Count == 0)
+                return false;
+            else if (!clause.HasProperty("proven"))
+            {
+                var valid = Validate(clause);
+                if (valid)
+                    clause.properties.proven = valid;
+                return valid;
+            }
+            return true;
         }
     }
 
@@ -323,6 +347,24 @@ namespace Heureka
                     visited.Add(node);
 
                     // Grouped Search Implemented Here
+
+                    //if (node.HasProperty("group"))
+                    //    foreach (var group in node.properties.group)
+                    //    {
+                    //        var proven = true;
+                    //        foreach(var edge in group)
+                    //        {
+                    //            if (!visited.Contains(edge.end))
+                    //            {
+                    //                if (!edge.end.HasProperty("proven"))
+                    //                {
+
+                    //                }
+
+                    //            }
+                    //        }
+                    //    }
+
 
                     foreach (var edge in node.GetEdges())
                         if (frontier.Contains(edge.end) && edge.end.HasProperty("distance"))
@@ -607,14 +649,19 @@ namespace Heureka
 
         public bool Equals(Node node)
         {
-            if (HasIdentifier() && node.HasIdentifier())
-                return (properties.identifier == node.properties.identifier);
-            else
-                return (x == node.x && y == node.y);
+            try
+            {
+                return (x == node.x && y == node.y && properties.identifier == node.properties.identifier);
+            }
+            catch (Exception e)
+            {
+                return false;
+            }
         }
 
         public bool HasIdentifier()
         {
+            var id = properties.GetType().GetProperty("identifier");
             return (properties.GetType().GetProperty("identifier") != null);
         }
 
