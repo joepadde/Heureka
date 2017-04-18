@@ -26,8 +26,8 @@ namespace Heureka
     {
         static void Main(string[] args)
         {
-            RouteFinding();
-            //Inference();
+            //RouteFinding();
+            Inference();
         }
 
         static void RouteFinding()
@@ -51,7 +51,7 @@ namespace Heureka
         {
             var engine = Wrapper.EngineFromFile("C:/AI/inference.txt");
 
-            var clause = "b";
+            var clause = "a";
 
             if (engine.Validate(clause))
                 Console.WriteLine("VALID");
@@ -152,10 +152,9 @@ namespace Heureka
     #region Inference
     class Clause : Node
     {
-        public Clause(string id, int? dist = null) : base(id : id)
+        public Clause(string id) : base(id : id)
         {
-            if (dist.HasValue)
-                properties.distance = dist.Value;
+            properties.group = new List<List<Edge>>();
         }
     }
 
@@ -163,7 +162,8 @@ namespace Heureka
     {
         public InferenceEngine(string filepath) : base(null)
         {
-            properties.emptyclause = new Clause(Guid.NewGuid().ToString(), 0);
+            properties.emptyclause = new Clause(Guid.NewGuid().ToString());
+            properties.emptyclause.properties.heuristic = 0;
             string[] lines = System.IO.File.ReadAllLines(filepath);
             foreach (var line in lines)
             {
@@ -177,6 +177,7 @@ namespace Heureka
                 else if (keys.Length > 1)
                 {
                     var target = AddClause(keys[0]);
+                    var group = new List<Edge>();
                     for(int i = 2; i < keys.Length; i++)
                     {
                         if (keys[i] != keys[0])
@@ -184,26 +185,32 @@ namespace Heureka
                             var clause = AddClause(keys[i]);
                             var edge = new Edge(target, clause);
                             edge.properties.clause = true;
+                            group.Add(edge);
                             graph.AddEdge(edge);
                         }
                     }
+                    if (group.Count > 0)
+                        target.properties.group.Add(group);
                 }
+                for(int i = 0; i < 2; i++)
+                    UpdateHeuristics();
                 foreach (var n in graph.nodes)
                 {
-                    Console.WriteLine(n.properties.identifier.ToString());
+                    var str = n.properties.identifier.ToString() + " (d:" + n.properties.heuristic + ")  ";
+                    if (n.properties.group.Count > 0)
+                        foreach (var g in n.properties.group)
+                        {
+                            str = str + "[ ";
+                            foreach (var p in g)
+                                str = str + p.end.properties.identifier.ToString() + " ";
+                            str = str + "]";
+                        }
+                    Console.WriteLine(str);
                     foreach (var e in n.GetEdges())
                     {
                         var prop = e.end.properties.identifier.ToString();
                         var id = (prop != properties.emptyclause.properties.identifier.ToString()) ? prop : "E";
-                        var str = "";
-                        //if (e.end.GetEdges().Count > 0)
-                        //{
-                        //    str = " ( ";
-                        //    foreach (var edge in e.end.GetEdges())
-                        //        str = str + edge.end.properties.identifier.ToString() + " ";
-                        //    str = str + ")";
-                        //}
-                        Console.WriteLine("- " + id + str);
+                        Console.WriteLine("- " + id);
                     }
                     Console.WriteLine();
                 }
@@ -220,7 +227,10 @@ namespace Heureka
                 {
                     var pathfinder = new AStar(graph, clause);
                     var path = pathfinder.Find(clause:properties.emptyclause);
-                    return (path != null);
+                    var result = (path != null);
+                    if (result)
+                        return (path.Count > 0);
+                    return result;
                 }
             }
             return false;
@@ -238,6 +248,7 @@ namespace Heureka
             if (clause == null)
             {
                 clause = new Clause(id);
+                clause.properties.heuristic = 2; // fix this value
                 graph.AddNode(clause);
             }
             return clause;
@@ -250,6 +261,7 @@ namespace Heureka
             {
                 edge = new Edge(clause, properties.emptyclause);
                 edge.properties.clause = true;
+                edge.start.properties.heuristic = 1;
                 graph.AddEdge(edge);
             }
         }
@@ -257,6 +269,13 @@ namespace Heureka
         public Edge GetEmptyEdgeIfExists(Clause clause)
         {
             return clause.GetEdgeToNode(properties.emptyclause);
+        }
+
+        public void UpdateHeuristics()
+        {
+            foreach(var edge in graph.edges)
+                if (edge.end.properties.heuristic >= edge.start.properties.heuristic)
+                    edge.start.properties.heuristic = edge.end.properties.heuristic + 1;
         }
     }
 
@@ -284,7 +303,7 @@ namespace Heureka
                 if (node.Equals(goal))
                 {
                     if (inf)
-                        return new List<Edge>();
+                        return new List<Edge>() { graph.edges[0] }; // Return actual path instead of dummy
                     else
                         return RetrievePath(parent, goal);
                 }
@@ -356,7 +375,7 @@ namespace Heureka
             int index = 0;
             for (int i = 0; i < nodes.Count; i++)
             {
-                var euclidean = nodes[i].EuclideanDistance(target);
+                var euclidean = (nodes[i].HasProperty("heuristic")) ? nodes[i].properties.heuristic : nodes[i].EuclideanDistance(target);
                 var distance = nodes[i].properties.distance;
                 var total = euclidean + distance;
                 if (total < cost || cost == -1)
