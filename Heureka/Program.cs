@@ -17,8 +17,8 @@ using System.Threading.Tasks;
  */
 
 /*
- * NOTE TO SELF: USE HEURISTIC FOR CLAUSES
- */
+ * NOTE TO SELF: FULLY IMPLEMENT GROUPED SEARCH
+*/
 
 namespace Heureka
 {
@@ -58,13 +58,6 @@ namespace Heureka
             else
                 Console.WriteLine("UNPROVEN");
 
-            //// Print route to Console (optionally file)
-            //var filepath = "";
-            ////var filepath = "C:/Users/nickl/Desktop/route.txt";
-            //Wrapper.Print(solution, filepath);
-
-            //// If printing to file, open it, else leave Console open
-            //Wrapper.OpenFileIfExists(filepath);
             Console.ReadKey();
         }
 
@@ -156,6 +149,15 @@ namespace Heureka
         {
             properties.group = new List<List<Edge>>();
         }
+
+        public static bool GroupIsProven(List<Edge> group)
+        {
+            var proven = new List<Edge>();
+            foreach (var edge in group)
+                if (edge.end.HasProperty("proven"))
+                    proven.Add(edge);
+            return (proven.Count == group.Count);
+        }
     }
 
     class InferenceEngine : GraphConstructor
@@ -166,6 +168,7 @@ namespace Heureka
         {
             properties.emptyclause = new Clause(Guid.NewGuid().ToString());
             properties.emptyclause.properties.heuristic = 0;
+            properties.emptyclause.properties.proven = true;
             string[] lines = System.IO.File.ReadAllLines(filepath);
             foreach (var line in lines)
             {
@@ -254,7 +257,7 @@ namespace Heureka
             if (clause == null)
             {
                 clause = new Clause(id);
-                clause.properties.heuristic = UNPROVEN_DISTANCE; // fix this value
+                clause.properties.heuristic = UNPROVEN_DISTANCE;
                 graph.AddNode(clause);
             }
             UpdateHeuristics();
@@ -290,7 +293,30 @@ namespace Heureka
                 if (edge.end.properties.heuristic >= edge.start.properties.heuristic && edge.end.properties.heuristic != UNPROVEN_DISTANCE)
                     edge.start.properties.heuristic = edge.end.properties.heuristic + 1;
             }
+            //UpdateProofs();
         }
+
+        //public void UpdateProofs()
+        //{
+        //    foreach (var node in graph.nodes)
+        //        if (AttemptProof(node))
+        //            node.properties.proven = true;
+        //}
+
+        //public bool AttemptProof(Node clause)
+        //{
+        //    if (clause.GetEdges().Count == 0)
+        //        return false;
+
+        //    var valid = false;
+        //    foreach (var group in clause.properties.group)
+        //        if (Clause.GroupIsProven(group))
+        //        {
+        //            valid = true;
+        //            break;
+        //        }
+        //    return valid;
+        //}
 
         public bool AttemptProof(Clause clause)
         {
@@ -312,7 +338,12 @@ namespace Heureka
     #region Search Algorithms
     class AStar : Pathfinder
     {
-        public AStar(Graph graph, Node node = null, int? x = null, int? y = null, string id = null) : base(graph, node, x, y, id) { }
+        private List<Edge> VALID_RETURN;
+
+        public AStar(Graph graph, Node node = null, int? x = null, int? y = null, string id = null) : base(graph, node, x, y, id)
+        {
+            VALID_RETURN = new List<Edge>() { graph.edges[0] };
+        }
 
         public override List<Edge> Find(int x = 0, int y = 0, Clause clause = null)
         {
@@ -331,7 +362,7 @@ namespace Heureka
                 if (node.Equals(goal))
                 {
                     if (inf)
-                        return new List<Edge>() { graph.edges[0] }; // Return actual path instead of dummy
+                        return VALID_RETURN; // Return actual path instead of dummy?
                     else
                         return RetrievePath(parent, goal);
                 }
@@ -345,27 +376,6 @@ namespace Heureka
                 if (!visited.Contains(node))
                 {
                     visited.Add(node);
-
-                    // Grouped Search Implemented Here
-
-                    //if (node.HasProperty("group"))
-                    //    foreach (var group in node.properties.group)
-                    //    {
-                    //        var proven = true;
-                    //        foreach(var edge in group)
-                    //        {
-                    //            if (!visited.Contains(edge.end))
-                    //            {
-                    //                if (!edge.end.HasProperty("proven"))
-                    //                {
-
-                    //                }
-
-                    //            }
-                    //        }
-                    //    }
-
-
                     foreach (var edge in node.GetEdges())
                         if (frontier.Contains(edge.end) && edge.end.HasProperty("distance"))
                         {
@@ -447,6 +457,17 @@ namespace Heureka
             throw new NotImplementedException();
         }
     }
+
+    class INF : Pathfinder
+    {
+        public INF(Graph graph, Clause node) : base(graph, node) { }
+
+        public override List<Edge> Find(int x = 0, int y = 0, Clause clause = null)
+        {
+            return null;
+        }
+    }
+
     #endregion
 
     #region General Purpose
