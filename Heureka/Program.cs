@@ -223,10 +223,37 @@ namespace Heureka
         public RBFS(Graph graph, Node node) : base(graph, node) { }
 
         public override List<Edge> Find(int x, int y)
-        {   
-            // TO BE IMPLEMENTED
+        {
+            var goal = SearchNode(x, y);
+            if (graph.isNullOrEmpty() || pos == null || goal == null)
+                return null;
+            var frontier = new List<Node>();
+            var visited = new List<Node>();
+            frontier.Add(pos);
+            properties.distance[pos.ToString()] = 0;
             throw new NotImplementedException();
+
         }
+        public double? SearchRBFS(Node start ,Node n, double value, int B, Node goal)
+        {
+
+            if (value > B) { return value; }
+            else if (n == goal) return null;
+            else if (n.GetEdges().Count == 0) { return -1; }
+            else foreach (var Edge in n.GetEdges())
+                {
+                    if (value > n.EuclideanDistance(start)) { Edge.end.properties.cost = Math.Max(value, Edge.end.EuclideanDistance(start)); }
+                    else value = Edge.end.EuclideanDistance(start);     
+                } 
+            
+           if (n.GetEdges().Count == 1) { value = -1; }
+           while(n.properties.cost <= B && n.properties.cost < int.MaxValue)
+            {
+                n.properties.cost = SearchRBFS(start, n.GetEdges().First().end, n.properties.cost, Math.Min(B, n.GetEdges()[1].end.properties.cost), goal);
+
+            }
+            return n.properties.cost;
+        } 
     }
 
     #endregion
