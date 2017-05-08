@@ -26,17 +26,17 @@ namespace Heureka
     {
         static void Main(string[] args)
         {
-            //RouteFinding();
-            Inference();
+            RouteFinding();
+            //Inference();
         }
 
         static void RouteFinding()
         {
             // Constructs a new graph from specified file
-            var graph = Wrapper.MapFromFile("C:/AI/manhattan.txt");
+            var graph = Wrapper.MapFromFile("C:/AI/copenhagen.txt");
 
             // Solves the Route Finding problem
-            var solution = Solve(graph, "street_6", "avenue_7");
+            var solution = Solve(graph, "Studiestraede", "Larsbjoernsstraede");
 
             // Print route to Console (optionally file)
             //var filepath = "";
@@ -50,15 +50,15 @@ namespace Heureka
         static void Inference()
         {
             var engine = Wrapper.EngineFromFile("C:/AI/inference.txt");
+            engine.Print();
 
-            var clause = "a";
+            while (true)
+            {
+                Console.Write("\nEnter clause: ");
+                engine.Tell(Console.ReadLine());
+                engine.Print();
+            }
 
-            if (engine.Validate(clause))
-                Console.WriteLine("VALID");
-            else
-                Console.WriteLine("UNPROVEN");
-
-            Console.ReadKey();
         }
 
         static List<string> Solve(Graph graph, string edge1, string edge2)
@@ -67,7 +67,7 @@ namespace Heureka
             var pathfinder = new AStar(graph, graph.GetNodeFromEdgeIdentifiers(edge1, edge2));
 
             // Where to?
-            return Wrapper.GetRouteAsList(pathfinder, 0, 0);
+            return Wrapper.GetRouteAsList(pathfinder, 55, 55);
         }
 
     }
@@ -139,7 +139,6 @@ namespace Heureka
     {
         public MapReader(string filepath) : base(filepath) { }
     }
-
     #endregion
 
     #region Inference
@@ -150,13 +149,26 @@ namespace Heureka
             properties.group = new List<List<Edge>>();
         }
 
-        public static bool GroupIsProven(List<Edge> group)
+        public void UpdateHeuristic()
         {
-            var proven = new List<Edge>();
-            foreach (var edge in group)
-                if (edge.end.HasProperty("proven"))
-                    proven.Add(edge);
-            return (proven.Count == group.Count);
+            var updated = false;
+            foreach (var edge in GetEdges())
+            {
+                if (edge.end.properties.heuristic + 1 < edge.start.properties.heuristic)
+                {
+                    edge.start.properties.heuristic = edge.end.properties.heuristic + 1;
+                    updated = true;
+                }
+
+                if (edge.end.properties.heuristic >= edge.start.properties.heuristic && edge.end.properties.heuristic != int.MaxValue - 1)
+                {
+                    edge.start.properties.heuristic = edge.end.properties.heuristic + 1;
+                    updated = true;
+                }
+            }
+            if (updated && HasProperty("parents"))
+                foreach (var parent in properties.parents)
+                    parent.UpdateHeuristic();
         }
     }
 
@@ -172,52 +184,94 @@ namespace Heureka
             string[] lines = System.IO.File.ReadAllLines(filepath);
             foreach (var line in lines)
             {
-                Console.WriteLine("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
-                var keys = line.Split(' ');
-                if (keys.Length == 1 && !String.IsNullOrEmpty(keys[0]))
+                Tell(line);
+            }
+        }
+
+        public void Tell(string line)
+        {
+            var keys = line.Split(' ');
+            if (keys.Length == 1 && !String.IsNullOrEmpty(keys[0]))
+            {
+                var clause = AddClause(keys[0]);
+                AddEdgeToEmpty(clause);
+            }
+            else if (keys.Length > 1)
+            {
+                var target = AddClause(keys[0]);
+                var group = new List<Edge>();
+                for (int i = 2; i < keys.Length; i++)
                 {
-                    var clause = AddClause(keys[0]);
-                    AddEdgeToEmpty(clause);
-                }
-                else if (keys.Length > 1)
-                {
-                    var target = AddClause(keys[0]);
-                    var group = new List<Edge>();
-                    for(int i = 2; i < keys.Length; i++)
+                    if (keys[i] != keys[0])
                     {
-                        if (keys[i] != keys[0])
-                        {
-                            var clause = AddClause(keys[i]);
-                            var edge = new Edge(target, clause);
-                            edge.properties.clause = true;
-                            group.Add(edge);
-                            graph.AddEdge(edge);
-                        }
+                        var clause = AddClause(keys[i]);
+                        var edge = new Edge(target, clause);
+                        edge.properties.clause = true;
+                        group.Add(edge);
+                        graph.AddEdge(edge);
                     }
-                    if (group.Count > 0)
-                        target.properties.group.Add(group);
                 }
-                foreach (var n in graph.nodes)
-                {
-                    var proven = (AttemptProof((Clause)n)) ? ", proven" : "";
-                    var str = n.properties.identifier.ToString() + " (d:" + n.properties.heuristic + "" + proven + ")  ";
-                    if (n.properties.group.Count > 0)
-                        foreach (var g in n.properties.group)
-                        {
-                            str = str + "[ ";
-                            foreach (var p in g)
-                                str = str + p.end.properties.identifier.ToString() + " ";
-                            str = str + "]";
-                        }
-                    Console.WriteLine(str);
-                    foreach (var e in n.GetEdges())
+                if (group.Count > 0)
+                    target.properties.group.Add(group);
+            }
+
+            /* TEMP. FIX - RECURSIVELY RUN THROUGH PARENT NODES INSTEAD */
+            /* FIX NOT WORKING */
+            //if (line != "*")
+            //{
+            //    var nodes = graph.nodes.Count;
+            //    for (int i = 0; i < nodes; i++)
+            //    {
+            //        Tell("*");
+            //    }
+            //}
+        }
+
+        public void Print()
+        {
+            foreach (var n in graph.nodes)
+            {
+                // DEBUGGING
+                //var proven = (AttemptProof((Clause)n)) ? ", proven" : "";
+                //var str = n.properties.identifier.ToString() + " (d:" + n.properties.heuristic + "" + proven + ")  ";
+                //if (n.properties.group.Count > 0)
+                //    foreach (var g in n.properties.group)
+                //    {
+                //        str = str + "[ ";
+                //        foreach (var p in g)
+                //            str = str + p.end.properties.identifier.ToString() + " ";
+                //        str = str + "]";
+                //    }
+                var proven = (AttemptProof((Clause)n)) ? " (proven)" : "";
+                var str = n.properties.identifier + proven;
+                if (n.properties.group.Count > 0 && n.properties.heuristic > 1)
+                    str = str + " if ";
+                    foreach (var g in n.properties.group)
                     {
-                        var prop = e.end.properties.identifier.ToString();
-                        var id = (prop != properties.emptyclause.properties.identifier.ToString()) ? prop : "E";
-                        Console.WriteLine("- " + id);
+                        var empty = false;
+                        var grp = "[ ";
+                        foreach (var p in g)
+                        {
+                            if (p.end.properties.identifier != properties.emptyclause.properties.identifier)
+                                grp = grp + p.end.properties.identifier.ToString() + " ";
+                            else
+                                empty = true;
+                        }
+                        if (!empty)
+                            str = str + grp + "] ";
+
                     }
-                    Console.WriteLine();
+                if (n.HasProperty("parents"))
+                {
+                    str = str + " {";
+                    foreach (var parent in n.properties.parents)
+                    {
+                        str = str + " " + parent.properties.identifier.ToString();
+                    }
+                    str = str + " }";
                 }
+                str = str + " (d: " + n.properties.heuristic + " )";
+                Console.WriteLine(str);
             }
         }
 
@@ -237,8 +291,9 @@ namespace Heureka
 
         public bool Validate(Clause clause)
         {
-            var pathfinder = new AStar(graph, clause);
-            var path = pathfinder.Find(clause:properties.emptyclause);
+            var pathfinder = new INF(graph, clause);
+            var path = pathfinder.Find(clause:clause);
+            //var path = pathfinder.Find(clause:properties.emptyclause);
             var result = (path != null);
             if (result)
                 return (path.Count > 0);
@@ -260,7 +315,7 @@ namespace Heureka
                 clause.properties.heuristic = UNPROVEN_DISTANCE;
                 graph.AddNode(clause);
             }
-            UpdateHeuristics();
+            //clause.UpdateHeuristic();
             AttemptProof(clause);
             return clause;
         }
@@ -273,6 +328,8 @@ namespace Heureka
                 edge = new Edge(clause, properties.emptyclause);
                 edge.properties.clause = true;
                 edge.start.properties.heuristic = 1;
+                edge.start.properties.group = new List<List<Edge>>() { new List<Edge>() { edge } };
+                edge.start.properties.proven = true;
                 graph.AddEdge(edge);
                 AttemptProof(clause);
             }
@@ -282,41 +339,6 @@ namespace Heureka
         {
             return clause.GetEdgeToNode(properties.emptyclause);
         }
-
-        public void UpdateHeuristics()
-        {
-            foreach (var edge in graph.edges)
-            {
-                if (edge.end.properties.heuristic + 1 < edge.start.properties.heuristic)
-                    edge.start.properties.heuristic = edge.end.properties.heuristic + 1;
-
-                if (edge.end.properties.heuristic >= edge.start.properties.heuristic && edge.end.properties.heuristic != UNPROVEN_DISTANCE)
-                    edge.start.properties.heuristic = edge.end.properties.heuristic + 1;
-            }
-            //UpdateProofs();
-        }
-
-        //public void UpdateProofs()
-        //{
-        //    foreach (var node in graph.nodes)
-        //        if (AttemptProof(node))
-        //            node.properties.proven = true;
-        //}
-
-        //public bool AttemptProof(Node clause)
-        //{
-        //    if (clause.GetEdges().Count == 0)
-        //        return false;
-
-        //    var valid = false;
-        //    foreach (var group in clause.properties.group)
-        //        if (Clause.GroupIsProven(group))
-        //        {
-        //            valid = true;
-        //            break;
-        //        }
-        //    return valid;
-        //}
 
         public bool AttemptProof(Clause clause)
         {
@@ -332,7 +354,6 @@ namespace Heureka
             return true;
         }
     }
-
     #endregion
 
     #region Search Algorithms
@@ -350,7 +371,7 @@ namespace Heureka
             var inf = (clause != null);
             var goal = (inf) ? clause : SearchNode(x, y);
             Dictionary<string, Node> parent = new Dictionary<string, Node>();
-            if (graph.isNullOrEmpty() || pos == null || goal == null)
+            if (graph.IsNullOrEmpty() || pos == null || goal == null)
                 return null;
             var frontier = new List<Node>();
             var visited = new List<Node>();
@@ -460,12 +481,48 @@ namespace Heureka
 
     class INF : Pathfinder
     {
-        public INF(Graph graph, Clause node) : base(graph, node) { }
+        const int UNPROVEN_DISTANCE = int.MaxValue - 1;
+        private List<Edge> VALID_RETURN;
+
+        public INF(Graph graph, Clause node) : base(graph, node)
+        {
+            VALID_RETURN = new List<Edge>() { graph.edges[0] };
+        }
 
         public override List<Edge> Find(int x = 0, int y = 0, Clause clause = null)
         {
+            if (clause == null)
+                return null;
+            if (!clause.HasProperty("group"))
+                return null;
+            if (clause.HasProperty("proven"))
+                return VALID_RETURN;
+
+            foreach (var group in clause.properties.group)
+                if (GroupIsProven(group))
+                {
+                    clause.properties.proven = true;
+                    return VALID_RETURN;
+                }
+
             return null;
         }
+
+        public bool GroupIsProven(List<Edge> group)
+        {
+            var proven = true;
+            foreach (var edge in group)
+            {
+                var clause = (Clause)edge.end;
+                if (!clause.HasProperty("proven"))
+                {
+                    proven = false;
+                    break;
+                }
+            }
+            return proven;
+        }
+
     }
 
     #endregion
@@ -600,13 +657,18 @@ namespace Heureka
         {
             edges.Add(edge);
             edge.start.AddEdge(edge);
+            edge.end.AddParent(edge.start);
+            try
+            {
+                var clause = (Clause)edge.end;
+                clause.UpdateHeuristic();
+            } catch (Exception e) { }
         }
 
-        public bool isNullOrEmpty()
+        public bool IsNullOrEmpty()
         {
             if (this == null)
                 return true;
-
             return (nodes.Count == 0 || edges.Count == 0);
         }
 
@@ -643,6 +705,20 @@ namespace Heureka
                 properties.identifier = Guid.NewGuid();
             if (edge != null)
                 AddEdge(edge);
+        }
+
+        public void AddParent(Node parent)
+        {
+            if (HasProperty("parents"))
+            {
+                if (!properties.parents.Contains(parent))
+                    properties.parents.Add(parent);
+            }
+            else
+            {
+                properties.parents = new List<Node>();
+                properties.parents.Add(parent);
+            }
         }
 
         public void AddEdge(Edge edge)
@@ -682,13 +758,12 @@ namespace Heureka
 
         public bool HasIdentifier()
         {
-            var id = properties.GetType().GetProperty("identifier");
-            return (properties.GetType().GetProperty("identifier") != null);
+            return ((IDictionary<String, object>)properties).ContainsKey("identifier");
         }
 
         public bool HasProperty(string property)
         {
-            return (properties.GetType().GetProperty(property) != null);
+            return ((IDictionary<String, object>)properties).ContainsKey(property);
         }
 
         public override string ToString()
@@ -722,7 +797,7 @@ namespace Heureka
 
         public bool HasProperty(string property)
         {
-            return (properties.GetType().GetProperty(property) != null);
+            return ((IDictionary<String, object>)properties).ContainsKey(property);
         }
 
         public override string ToString()
